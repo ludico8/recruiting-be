@@ -1,0 +1,43 @@
+# Problema con el tipado de los controllers, por ejemplo:
+
+Asi esta mal:
+
+    export const updateProfile = (
+      req: Request<{ id: string }, {}, Partial<Profile>>, // Tipos para params, query y body
+      res: Response
+    ): Response => {
+      const { id } = req.params; // Obtiene el ID de los parámetros
+
+      // Encuentra el índice del perfil
+      const index = profiles.findIndex((p) => p.id === id);
+
+      if (index === -1) {
+        return res.status(404).json({ message: "Profile not found" });
+      }
+
+      // Actualiza el perfil
+      profiles[index] = { ...profiles[index], ...req.body };
+
+      // Devuelve el perfil actualizado
+      return res.json(profiles[index]);
+    };
+
+
+Asi esta bien:
+
+    export const updateProfile = (
+      req: Request<{ id: string }, {}, Partial<Profile>>, // Tipos específicos para params y body
+      res: Response
+    ): void => {
+      const { id } = req.params;
+
+      const index = profiles.findIndex((p) => p.id === id);
+      if (index === -1) {
+        res.status(404).json({ message: "Profile not found" });
+        return; // Retorno explícito para evitar `undefined`
+      }
+
+      profiles[index] = { ...profiles[index], ...req.body };
+      res.json(profiles[index]);
+    };
+
