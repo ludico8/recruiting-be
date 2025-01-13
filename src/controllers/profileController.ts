@@ -1,12 +1,14 @@
 import { Request, Response } from "express";
 import { profiles, Profile } from "./../models/profile";
+import { addProfile } from "../services/dynamodb";
+import { ProfileRequestBody } from "../types/profile";
 
-// Obtener todos los perfiles
+// Get profiles
 export const getProfiles = (req: Request, res: Response): void => {
   res.json(profiles);
 };
 
-// Obtener un perfil por ID
+// Find profile
 export const getProfileById = (req: Request, res: Response): void => {
   const { id } = req.params;
   const profile = profiles.find((p) => p.id === id);
@@ -19,16 +21,41 @@ export const getProfileById = (req: Request, res: Response): void => {
   res.json(profile);
 };
 
-// Crear un nuevo perfil
-export const createProfile = (req: Request, res: Response) => {
-  const newProfile: Profile = { id: Date.now().toString(), ...req.body };
-  profiles.push(newProfile);
-  res.status(201).json(newProfile);
+// Create new profile in DynamoDB
+export const createProfile = async (
+  req: Request<{}, {}, Omit<ProfileRequestBody, "id">>,
+  res: Response
+): Promise<void> => {
+  try {
+    const { name, skills, experience } = req.body;
+
+    // Field validation
+    if (!name || !skills || !experience) {
+      res.status(400).json({ message: "All fields are required." });
+      return;
+    }
+
+    // Create profile
+    const id = Date.now().toString();
+    const newProfile = { id, name, skills, experience };
+
+    // Save profile in DynamoDB
+    await addProfile(newProfile);
+
+    // Send response
+    res.status(201).json({
+      message: "Profile added successfully",
+      profile: newProfile,
+    });
+  } catch (error) {
+    console.error("Error adding profile:", error);
+    res.status(500).json({ message: "Internal server error." });
+  }
 };
 
-// Actualizar un perfil existente
+// Update profile
 export const updateProfile = (
-  req: Request<{ id: string }, {}, Partial<Profile>>, // Tipos específicos para params y body
+  req: Request<{ id: string }, {}, Partial<Profile>>,
   res: Response
 ): void => {
   const { id } = req.params;
@@ -36,21 +63,20 @@ export const updateProfile = (
   const index = profiles.findIndex((p) => p.id === id);
   if (index === -1) {
     res.status(404).json({ message: "Profile not found" });
-    return; // Retorno explícito para evitar `undefined`
+    return;
   }
 
   profiles[index] = { ...profiles[index], ...req.body };
   res.json(profiles[index]);
 };
 
-// Eliminar un perfil
+// Delete profile
 export const deleteProfile = (
-  req: Request<{ id: string }>, // Tipado para params
+  req: Request<{ id: string }>,
   res: Response
 ): void => {
-  const { id } = req.params; // Obtiene el ID de los parámetros
+  const { id } = req.params;
 
-  // Encuentra el índice del perfil
   const index = profiles.findIndex((p) => p.id === id);
 
   if (index === -1) {
@@ -58,9 +84,9 @@ export const deleteProfile = (
     return;
   }
 
-  // Elimina el perfil
-  const [deletedProfile] = profiles.splice(index, 1); // Elimina y obtiene el perfil eliminado
+  // Delete profile
+  const [deletedProfile] = profiles.splice(index, 1);
 
-  // Devuelve el perfil eliminado
+  // return deleted profile
   res.json(deletedProfile);
 };
